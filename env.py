@@ -98,7 +98,7 @@ class ur5GymEnv(gym.Env):
             jointMaxVelocity = info[11]
             controllable = True if jointName in self.control_joints else False
             info = self.joint_info(jointID, jointName, jointType, jointLowerLimit, jointUpperLimit, jointMaxForce, jointMaxVelocity, controllable)
-            print(info)
+            # print(info)
             if info.type == "REVOLUTE":
                 p.setJointMotorControl2(self.ur5, info.id, p.VELOCITY_CONTROL, targetVelocity=0, force=0)
             self.joints[info.name] = info
