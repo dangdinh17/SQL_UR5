@@ -102,6 +102,24 @@ class ur5GymEnv(gym.Env):
             if info.type == "REVOLUTE":
                 p.setJointMotorControl2(self.ur5, info.id, p.VELOCITY_CONTROL, targetVelocity=0, force=0)
             self.joints[info.name] = info
+            
+            link_state = p.getLinkState(self.ur5, jointID)
+
+            # Tọa độ của vị trí gắn kết link (parent)
+            parent_pos = link_state[0]
+            # Tọa độ của frame của liên kết con (child)
+            child_pos = link_state[4]
+
+            # Tính độ dài joint (khoảng cách giữa hai điểm)
+            joint_length = ((child_pos[0] - parent_pos[0]) ** 2 +
+                            (child_pos[1] - parent_pos[1]) ** 2 +
+                            (child_pos[2] - parent_pos[2]) ** 2) ** 0.5
+
+            # In ra kết quả
+            print(f"Joint ID: {jointID}")
+            print(f"Joint Name: {jointName}")
+            print(f"Joint Length: {joint_length:.4f} meters")
+            print("-" * 40)
 
         # Tray
         new_tray_positions = [[0.25, -0.4, 0], [0.5, -0.4, 0], [0.75, -0.4, 0]]  # Positions for new trays
@@ -376,7 +394,7 @@ class ur5GymEnv(gym.Env):
     
     
 def main():
-    env = ur5GymEnv()
+    env = ur5GymEnv(renders=False)
     while True:
         pass
     
