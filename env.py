@@ -103,23 +103,23 @@ class ur5GymEnv(gym.Env):
                 p.setJointMotorControl2(self.ur5, info.id, p.VELOCITY_CONTROL, targetVelocity=0, force=0)
             self.joints[info.name] = info
             
-            link_state = p.getLinkState(self.ur5, jointID)
+            # link_state = p.getLinkState(self.ur5, jointID)
 
-            # Tọa độ của vị trí gắn kết link (parent)
-            parent_pos = link_state[0]
-            # Tọa độ của frame của liên kết con (child)
-            child_pos = link_state[4]
+            # # Tọa độ của vị trí gắn kết link (parent)
+            # parent_pos = link_state[0]
+            # # Tọa độ của frame của liên kết con (child)
+            # child_pos = link_state[4]
 
-            # Tính độ dài joint (khoảng cách giữa hai điểm)
-            joint_length = ((child_pos[0] - parent_pos[0]) ** 2 +
-                            (child_pos[1] - parent_pos[1]) ** 2 +
-                            (child_pos[2] - parent_pos[2]) ** 2) ** 0.5
+            # # Tính độ dài joint (khoảng cách giữa hai điểm)
+            # joint_length = ((child_pos[0] - parent_pos[0]) ** 2 +
+            #                 (child_pos[1] - parent_pos[1]) ** 2 +
+            #                 (child_pos[2] - parent_pos[2]) ** 2) ** 0.5
 
-            # In ra kết quả
-            print(f"Joint ID: {jointID}")
-            print(f"Joint Name: {jointName}")
-            print(f"Joint Length: {joint_length:.4f} meters")
-            print("-" * 40)
+            # # In ra kết quả
+            # print(f"Joint ID: {jointID}")
+            # print(f"Joint Name: {jointName}")
+            # print(f"Joint Length: {joint_length:.4f} meters")
+            # print("-" * 40)
 
         # Tray
         new_tray_positions = [[0.25, -0.4, 0], [0.5, -0.4, 0], [0.75, -0.4, 0]]  # Positions for new trays
@@ -264,21 +264,21 @@ class ur5GymEnv(gym.Env):
             if self.target_dist < self.learning_param:# and approach_velocity < 0.05:
                 if self.current_task == 0:
                     self.obj_picked_up = True
-                    # print('Successful object reach')
+                    print('Successful object reach')
                 if self.current_task == 2:
                     self.obj_picked_up = False
-                    # print('Successful target reach')
+                    print('Successful target reach')
                 self.current_task += 1
         
         # task 1,3: lift up:
         if self.current_task == 1 or self.current_task == 3:
             if self.tool_pos[2] > 0.3:# and approach_velocity < 0.05:
-                # if self.current_task == 1:
-                    # print('Successful picked up!')
-                # if self.current_task == 3:
-                    # print('Successful drop!')
+                if self.current_task == 1:
+                    print('Successful picked up!')
+                if self.current_task == 3:
+                    print('Successful drop!')
                 self.current_task += 1
-                # print('Successful!')
+                print('Successful!')
 
         # penalize if it tries to go lower than desk / platform collision:
         # if grip_trans[1] < self.desired_goal[1]-0.08: # lower than position of object!
