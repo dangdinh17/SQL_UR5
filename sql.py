@@ -47,5 +47,5 @@ class SoftQNetwork(nn.Module):
     def get_V(self, q):
         # print(q)
         # print(q.shape)
-        v = self.alpha * torch.logsumexp(q / self.alpha, dim=-1)
+        v = self.alpha * torch.log(torch.mean(torch.exp(q / self.alpha), dim=-1))
         return v

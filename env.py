@@ -44,10 +44,10 @@ class ur5GymEnv(gym.Env):
                  useIK=True,
                  actionRepeat=1,
                  renders=True,
-                 maxSteps=100,
+                 maxSteps=200,
                  simulatedGripper=False,
                  randObjPos=False,
-                 task=0, # here target number
+                 task=4, # here target number
                  learning_param=0):
 
         self.renders = renders
@@ -120,6 +120,8 @@ class ur5GymEnv(gym.Env):
             # print(f"Joint Name: {jointName}")
             # print(f"Joint Length: {joint_length:.4f} meters")
             # print("-" * 40)
+        # num_dof = p.getNumJoints(self.ur5)  # robot_id là ID của robot UR5 trong PyBullet
+        # print(f"Số bậc tự do của robot: {num_dof}")
 
         # Tray
         new_tray_positions = [[0.25, -0.4, 0], [0.5, -0.4, 0], [0.75, -0.4, 0]]  # Positions for new trays
@@ -135,7 +137,7 @@ class ur5GymEnv(gym.Env):
         for tray in trays:
             if tray.color == self.obj_color:
                 self.initial_target_pos = tray.pos
-                self.initial_target_pos[2] = self.initial_target_pos[2]+0.1
+                # self.initial_target_pos[2] = self.initial_target_pos[2]+0.1
                 # print(self.initial_target_pos)
                 # print(self.initial_obj_pos)
                 break
@@ -180,11 +182,11 @@ class ur5GymEnv(gym.Env):
         self.set_joint_angles(joint_angles)
 
         # reset gripper:
-        self.control_gripper(-0.4) # open
+        self.control_gripper(0.8) # open
 
         # step simualator:
         for i in range(100):
-            p.stepSimulation()
+            self.step_simulation()
 
         # get obs and return:
         self.getExtendedObservation()
@@ -194,7 +196,7 @@ class ur5GymEnv(gym.Env):
         action = np.array(action)
         arm_action = action[0:self.action_dim-1].astype(float) # dX, dY, dZ - range: [-1,1]
         gripper_action = action[self.action_dim-1].astype(float) # gripper - range: [-1=closed,1=open]
-
+        # print(gripper_action)
         # simualted gripping:
         # if self.obj_picked_up and gripper_action < -0.1:
         if self.current_task == 1 or self.current_task == 2:
@@ -216,19 +218,20 @@ class ur5GymEnv(gym.Env):
             joint_angles = self.calculate_ik(new_p, self.ur5_or) # XYZ and angles set to zero
         else:
             joint_angles = new_p
-        # print(len(joint_angles))
-        
+        # print(joint_angles)
+        # for i in range(100):
+        #     self.step_simulation()
         self.set_joint_angles(joint_angles[:6])
 
-        # operate gripper: close = 0.4, open = -0.4, 2.5 to scale to std=1, nn max value
-        gripper_action = np.clip(gripper_action/2.5, -0.4, 0.4)
+        # operate gripper: close = 0.8, open = 0, 2.5 to scale to std=1, nn max value
+        gripper_action = np.clip(gripper_action/2.5, -0.4, 0.4) + 0.4
+        # print(gripper_action)
         self.control_gripper(gripper_action)
 
         
         # step simualator:
         for i in range(self.actionRepeat):
-            p.stepSimulation()
-            if self.renders: time.sleep(1./240.)
+            self.step_simulation()
         
         self.getExtendedObservation()
         reward = self.compute_reward() # call this after getting obs!
@@ -260,6 +263,8 @@ class ur5GymEnv(gym.Env):
         reward += -self.target_dist * 10
 
         # task 0,2: reach object/target:
+        # print(self.current_task)
+        
         if self.current_task == 0 or self.current_task == 2:
             if self.target_dist < self.learning_param:# and approach_velocity < 0.05:
                 if self.current_task == 0:
@@ -281,9 +286,9 @@ class ur5GymEnv(gym.Env):
                 print('Successful!')
 
         # penalize if it tries to go lower than desk / platform collision:
-        # if grip_trans[1] < self.desired_goal[1]-0.08: # lower than position of object!
-        #     reward[i] += -1
-        #     print('Penalty: lower than desk!')
+        if self.tool_pos[2] < 0: # lower than position of object!
+            reward += -1
+            # print('Penalty: lower than desk!')
 
         # check collisions:
         if self.check_collisions(): 
@@ -297,7 +302,9 @@ class ur5GymEnv(gym.Env):
         
     def my_task_done(self):
         # NOTE: need to call compute_reward before this to check termination!
-        c = (self.current_task == self.task+1 or self.stepCounter > self.maxSteps)
+        if self.current_task == self.task:
+            print(f'done with {self.current_task}')
+        c = (self.current_task == self.task or self.stepCounter > self.maxSteps)
         return c
     
     def getExtendedObservation(self):
@@ -328,7 +335,8 @@ class ur5GymEnv(gym.Env):
             targetPosition=gripper_opening_angle,
             force=self.joints[self.gripper_main_control_joint_name].maxForce,
             maxVelocity=self.joints[self.gripper_main_control_joint_name].maxVelocity)
-        
+        # for i in range(100):
+        self.step_simulation()
         for i in range(len(self.mimic_joint_name)):
             joint = self.joints[self.mimic_joint_name[i]]
             p.setJointMotorControl2(
@@ -355,7 +363,7 @@ class ur5GymEnv(gym.Env):
 
         if len(joint_angles) != len(indexes):
             raise ValueError("Mismatch between poses and joint indexes. Check your control_joints and joint_angles.")
-        
+        self.step_simulation()
         p.setJointMotorControlArray(
             self.ur5, indexes,
             p.POSITION_CONTROL,
@@ -386,17 +394,32 @@ class ur5GymEnv(gym.Env):
 
         joint_angles = p.calculateInverseKinematics(
             self.ur5, self.end_effector_index, position, quaternion, 
-            jointDamping=[0.01]*6, upperLimits=upper_limits, 
-            lowerLimits=lower_limits, jointRanges=joint_ranges, 
+            jointDamping=[0.01]*self.num_joints, 
+            upperLimits=upper_limits, 
+            lowerLimits=lower_limits, 
+            jointRanges=joint_ranges, 
             restPoses=rest_poses
         )
         return joint_angles
+    def step_simulation(self):
+        p.stepSimulation()
+        if self.render:
+            time.sleep(1./240.)
     
+# def main():
+#     env = ur5GymEnv(renders=True)
+#     env.reset()
+#     for i in range(100):
+#         lengt = float(input())
+#         # while True: # print(f"Lần {i + 1}: Mở tay gắp")
+#         gripper_opening_length = lengt
+#         # opening_angle = 0.715 - math.asin((gripper_opening_length - 0.010) / 0.1143)    # angle calculation
+        
+#         env.control_gripper(lengt)  # Đóng tay gắp
+#         # time.sleep(1/240)  # Đợi 1 giây để quan sát
+#         # p.stepSimulation()
+#         # print( opening_angle)
+#         print("Hoàn thành việc đóng mở tay gắp 5 lần.")
     
-def main():
-    env = ur5GymEnv(renders=False)
-    while True:
-        pass
-    
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
