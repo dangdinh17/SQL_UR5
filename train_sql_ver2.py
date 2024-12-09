@@ -129,13 +129,12 @@ class SoftQLearning:
 
 # Example usage
 if __name__ == "__main__":
-    render  = False
+    render  = True
     env = ur5GymEnv(renders=render)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
 
     agent = SoftQLearning(state_dim, action_dim)
-
     num_episodes = 5000
     batch_size = 64
     episode_rewards = []
@@ -143,7 +142,7 @@ if __name__ == "__main__":
         state = env.reset()
         episode_reward = 0
 
-        for step in tqdm(range(200), desc=f"Episode {episode + 1} Steps"):
+        for step in tqdm(range(200), desc=f"Episode {episode + 1}/{num_episodes}"):
 
             state_tensor = torch.FloatTensor(state).unsqueeze(0)
             action, _ = agent.policy_network.sample_action(state_tensor)
@@ -164,7 +163,7 @@ if __name__ == "__main__":
 
         agent.episode_rewards.append(episode_reward)  # Lưu episode reward
         print(f"Episode {episode + 1}, Reward: {episode_reward}")
-
+        
     # Vẽ đồ thị sau khi huấn luyện
     plt.figure(figsize=(12, 4))
 
