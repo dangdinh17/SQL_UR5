@@ -160,7 +160,7 @@ class SoftQLearning:
 
 # Example usage
 if __name__ == "__main__":
-    render = False
+    render = True
     env = ur5GymEnv(renders=render)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]

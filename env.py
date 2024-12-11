@@ -42,13 +42,13 @@ class ur5GymEnv(gym.Env):
     def __init__(self,
                  camera_attached=False,
                  useIK=True,
-                 actionRepeat=120,
+                 actionRepeat=60,
                  renders=True,
                  maxSteps=200,
                  simulatedGripper=False,
                  randObjPos=False,
                  task=4, # here target number
-                 learning_param=0):
+                 learning_param=0.05):
 
         self.renders = renders
         self.actionRepeat = actionRepeat
@@ -396,8 +396,8 @@ class ur5GymEnv(gym.Env):
             upperLimits=upper_limits, 
             lowerLimits=lower_limits, 
             jointRanges=joint_ranges, 
-            restPoses=rest_poses,
-            maxNumIterations=20
+            restPoses=rest_poses
+            ,maxNumIterations=20
         )
         return joint_angles
     def step_simulation(self):
