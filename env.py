@@ -41,10 +41,10 @@ class Tray:
 class ur5GymEnv(gym.Env):
     def __init__(self,
                  camera_attached=False,
-                 useIK=True,
-                 actionRepeat=60,
+                 useIK=False,
+                 actionRepeat=1,
                  renders=True,
-                 maxSteps=200,
+                 maxSteps=100,
                  simulatedGripper=False,
                  randObjPos=False,
                  task=4, # here target number
@@ -183,7 +183,7 @@ class ur5GymEnv(gym.Env):
         self.control_gripper(open_angle) # open
 
         # step simualator:
-        for i in range(10):
+        for i in range(100):
             self.step_simulation()
 
         # get obs and return:
@@ -424,25 +424,30 @@ class ur5GymEnv(gym.Env):
             # # Lấy thông tin ràng buộc
             # constraint_info = p.getConstraintInfo(c)
             # print(f"Constraint Info for ID {c}: {constraint_info}")
+    
+    def close(self):
+        p.disconnect()
 def main():
     env = ur5GymEnv(renders=True)
     env.reset()
-    for i in range(100):
-        open_length = float(input())
-        # while True: # print(f"Lần {i + 1}: Mở tay gắp")
+    # env.close()
+    # for i in range(100):
+    #     open_length = float(input())
+    #     # while True: # print(f"Lần {i + 1}: Mở tay gắp")
         
-        open_angle = 0.715 - math.asin((open_length - 0.010) / 0.1143) 
-        print(open_angle)
-        # opening_angle = 0.715 - math.asin((gripper_opening_length - 0.010) / 0.1143)
-        # # angle calculation
-        env.control_gripper(open_angle)
-        for _ in range(120):
-            env.step_simulation()
-              # Đóng tay gắp
-        # time.sleep(1/240)  # Đợi 1 giây để quan sát
-        # p.stepSimulation()
-        # print( opening_angle)
-        print("Hoàn thành việc đóng mở tay gắp 5 lần.")
-    
+    #     open_angle = 0.715 - math.asin((open_length - 0.010) / 0.1143) 
+    #     print(open_angle)
+    #     # opening_angle = 0.715 - math.asin((gripper_opening_length - 0.010) / 0.1143)
+    #     # # angle calculation
+    #     env.control_gripper(open_angle)
+    #     for _ in range(120):
+    #         env.step_simulation()
+    #           # Đóng tay gắp
+    #     # time.sleep(1/240)  # Đợi 1 giây để quan sát
+    #     # p.stepSimulation()
+    #     # print( opening_angle)
+    #     print("Hoàn thành việc đóng mở tay gắp 5 lần.")
+    while True:
+        pass
 if __name__ == "__main__":
     main()
