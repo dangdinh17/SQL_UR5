@@ -14,7 +14,7 @@ from collections import namedtuple
 from attrdict import AttrDict
 
 PROJECT_DATA = "./ur_e_description/urdf"
-ROBOT_URDF_PATH = os.path.join(PROJECT_DATA , "robot/ur5e_with_gripper.urdf")
+ROBOT_URDF_PATH = os.path.join(PROJECT_DATA , "robot/ur5_robotiq_85.urdf")
 TABLE_URDF_PATH = os.path.join(PROJECT_DATA , "table/table.urdf")
 CUBE_URDF_PATH = os.path.join(PROJECT_DATA , "cube/red.urdf")
 TRAY_URDF_PATH = [os.path.join(PROJECT_DATA , f"tray/tray_{color}.urdf") for color in ['red', 'green', 'blue']]
@@ -42,7 +42,7 @@ class ur5GymEnv(gym.Env):
     def __init__(self,
                  camera_attached=False,
                  useIK=True,
-                 actionRepeat=1,
+                 actionRepeat=120,
                  renders=True,
                  maxSteps=200,
                  simulatedGripper=False,
@@ -64,20 +64,14 @@ class ur5GymEnv(gym.Env):
         p.setGravity(0,0,-10)
         p.setRealTimeSimulation(False)
         # p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME,1)
+        # p.resetDebugVisualizerCamera( cameraDistance=1.5, cameraYaw=90, cameraPitch=0, cameraTargetPosition=[0,0,0])
         p.resetDebugVisualizerCamera( cameraDistance=1.5, cameraYaw=60, cameraPitch=-30, cameraTargetPosition=[0,0,0])
+
         
-        # gripper info:
-        self.gripper_main_control_joint_name = "robotiq_85_left_knuckle_joint"
-        self.mimic_joint_name = ["robotiq_85_right_knuckle_joint",
-                    "robotiq_85_left_inner_knuckle_joint",
-                    "robotiq_85_right_inner_knuckle_joint",
-                    "robotiq_85_left_finger_tip_joint",
-                    "robotiq_85_right_finger_tip_joint"]
-        self.mimic_multiplier = [1, 1, 1, -1, -1]
+        
         
         # setup robot arm:
         self.end_effector_index = 7
-        self.table = p.loadURDF(TABLE_URDF_PATH, [0.45, -0.1, -0.65], [0, 0, 0, 1])
         flags = p.URDF_USE_SELF_COLLISION
         self.ur5 = p.loadURDF(ROBOT_URDF_PATH, [0, 0, 0], [0, 0, 0, 1], flags=flags)
         self.num_joints = p.getNumJoints(self.ur5)
@@ -96,33 +90,35 @@ class ur5GymEnv(gym.Env):
             jointUpperLimit = info[9]
             jointMaxForce = info[10]
             jointMaxVelocity = info[11]
-            controllable = True if jointName in self.control_joints else False
+            controllable = True if jointType != 'FIXED' else False
+            # controllable = True if jointName in self.mimic_children_names else controllable
             info = self.joint_info(jointID, jointName, jointType, jointLowerLimit, jointUpperLimit, jointMaxForce, jointMaxVelocity, controllable)
             # print(info)
-            if info.type == "REVOLUTE":
+            if controllable:
                 p.setJointMotorControl2(self.ur5, info.id, p.VELOCITY_CONTROL, targetVelocity=0, force=0)
             self.joints[info.name] = info
-            
-            # link_state = p.getLinkState(self.ur5, jointID)
+        # for joint_name, joint_info in self.joints.items():
+        #     print(f"Joint Name: {joint_name}")
+        #     print(f"Joint Info: {joint_info}")
 
-            # # Tọa độ của vị trí gắn kết link (parent)
-            # parent_pos = link_state[0]
-            # # Tọa độ của frame của liên kết con (child)
-            # child_pos = link_state[4]
-
-            # # Tính độ dài joint (khoảng cách giữa hai điểm)
-            # joint_length = ((child_pos[0] - parent_pos[0]) ** 2 +
-            #                 (child_pos[1] - parent_pos[1]) ** 2 +
-            #                 (child_pos[2] - parent_pos[2]) ** 2) ** 0.5
-
-            # # In ra kết quả
-            # print(f"Joint ID: {jointID}")
-            # print(f"Joint Name: {jointName}")
-            # print(f"Joint Length: {joint_length:.4f} meters")
-            # print("-" * 40)
-        # num_dof = p.getNumJoints(self.ur5)  # robot_id là ID của robot UR5 trong PyBullet
-        # print(f"Số bậc tự do của robot: {num_dof}")
-
+        # gripper info:
+        self.mimic_parent_name = 'finger_joint'
+        # self.mimic_children_names = ['right_outer_knuckle_joint',
+        #                         'left_inner_knuckle_joint',
+        #                         'right_inner_knuckle_joint',
+        #                         'left_inner_finger_joint',
+        #                         'right_inner_finger_joint']
+        # self.mimic_multiplier = [1, 1, 1, -1, -1]
+        self.mimic_children_names = {'right_outer_knuckle_joint': 1,
+                                'left_inner_knuckle_joint': 1,
+                                'right_inner_knuckle_joint': 1,
+                                'left_inner_finger_joint': -1,
+                                'right_inner_finger_joint': -1}
+        
+        self.setup_mimic_joints()
+        #table
+        self.table = p.loadURDF(TABLE_URDF_PATH, [0.45, -0.1, -0.65], [0, 0, 0, 1])
+        
         # Tray
         new_tray_positions = [[0.25, -0.4, 0], [0.5, -0.4, 0], [0.75, -0.4, 0]]  # Positions for new trays
         new_tray_colors = ["green", "red", "blue"]
@@ -182,10 +178,12 @@ class ur5GymEnv(gym.Env):
         self.set_joint_angles(joint_angles)
 
         # reset gripper:
-        self.control_gripper(0.8) # open
+        open_length = 0.085
+        open_angle = 0.715 - math.asin((open_length - 0.010) / 0.1143) 
+        self.control_gripper(open_angle) # open
 
         # step simualator:
-        for i in range(100):
+        for i in range(10):
             self.step_simulation()
 
         # get obs and return:
@@ -330,20 +328,20 @@ class ur5GymEnv(gym.Env):
     def control_gripper(self, gripper_opening_angle):
         p.setJointMotorControl2(
             self.ur5,
-            self.joints[self.gripper_main_control_joint_name].id,
+            self.joints[self.mimic_parent_name].id,
             p.POSITION_CONTROL,
             targetPosition=gripper_opening_angle,
-            force=self.joints[self.gripper_main_control_joint_name].maxForce,
-            maxVelocity=self.joints[self.gripper_main_control_joint_name].maxVelocity)
+            force=self.joints[self.mimic_parent_name].maxForce,
+            maxVelocity=self.joints[self.mimic_parent_name].maxVelocity)
         # for i in range(100):
-        self.step_simulation()
-        for i in range(len(self.mimic_joint_name)):
-            joint = self.joints[self.mimic_joint_name[i]]
-            p.setJointMotorControl2(
-                self.ur5, joint.id, p.POSITION_CONTROL,
-                targetPosition=gripper_opening_angle * self.mimic_multiplier[i],
-                force=joint.maxForce,
-                maxVelocity=joint.maxVelocity)
+        #     self.step_simulation()
+        # for i in range(len(self.mimic_children_names)):
+        #     joint = self.joints[self.mimic_children_names[i]]
+        #     p.setJointMotorControl2(
+        #         self.ur5, joint.id, p.POSITION_CONTROL,
+        #         targetPosition=gripper_opening_angle * self.mimic_multiplier[i],
+        #         force=joint.maxForce,
+        #         maxVelocity=joint.maxVelocity)
             
     def set_joint_angles(self, joint_angles):
         poses = []
@@ -363,7 +361,7 @@ class ur5GymEnv(gym.Env):
 
         if len(joint_angles) != len(indexes):
             raise ValueError("Mismatch between poses and joint indexes. Check your control_joints and joint_angles.")
-        self.step_simulation()
+        # self.step_simulation()
         p.setJointMotorControlArray(
             self.ur5, indexes,
             p.POSITION_CONTROL,
@@ -398,28 +396,53 @@ class ur5GymEnv(gym.Env):
             upperLimits=upper_limits, 
             lowerLimits=lower_limits, 
             jointRanges=joint_ranges, 
-            restPoses=rest_poses
+            restPoses=rest_poses,
+            maxNumIterations=20
         )
         return joint_angles
     def step_simulation(self):
         p.stepSimulation()
         if self.render:
             time.sleep(1./240.)
+            
+    def setup_mimic_joints(self):
+        self.mimic_parent_id = [joint_info.id for _,joint_info in self.joints.items() if joint_info.name == self.mimic_parent_name][0]
+        # print(self.mimic_parent_id)
+        self.mimic_child_multiplier = {joint_info.id: self.mimic_children_names[joint_info.name] for _,joint_info in self.joints.items() if joint_info.name in self.mimic_children_names}
+        # print(self.mimic_child_multiplier)
+        for joint_id, multiplier in self.mimic_child_multiplier.items():
+            # print(joint_id, multiplier)
+            c = p.createConstraint(self.ur5, self.mimic_parent_id,
+                                self.ur5, joint_id,
+                                jointType=p.JOINT_GEAR,
+                                jointAxis=[0, 1, 0],
+                                parentFramePosition=[0, 0, 0],
+                                childFramePosition=[0, 0, 0])
+            p.changeConstraint(c, gearRatio=-multiplier, maxForce=100, erp=0.5)  # Note: the mysterious `erp` is of EXTREME importance
+            # print(f"Constraint ID: {c}")
     
-# def main():
-#     env = ur5GymEnv(renders=True)
-#     env.reset()
-#     for i in range(100):
-#         lengt = float(input())
-#         # while True: # print(f"Lần {i + 1}: Mở tay gắp")
-#         gripper_opening_length = lengt
-#         # opening_angle = 0.715 - math.asin((gripper_opening_length - 0.010) / 0.1143)    # angle calculation
+            # # Lấy thông tin ràng buộc
+            # constraint_info = p.getConstraintInfo(c)
+            # print(f"Constraint Info for ID {c}: {constraint_info}")
+def main():
+    env = ur5GymEnv(renders=True)
+    env.reset()
+    for i in range(100):
+        open_length = float(input())
+        # while True: # print(f"Lần {i + 1}: Mở tay gắp")
         
-#         env.control_gripper(lengt)  # Đóng tay gắp
-#         # time.sleep(1/240)  # Đợi 1 giây để quan sát
-#         # p.stepSimulation()
-#         # print( opening_angle)
-#         print("Hoàn thành việc đóng mở tay gắp 5 lần.")
+        open_angle = 0.715 - math.asin((open_length - 0.010) / 0.1143) 
+        print(open_angle)
+        # opening_angle = 0.715 - math.asin((gripper_opening_length - 0.010) / 0.1143)
+        # # angle calculation
+        env.control_gripper(open_angle)
+        for _ in range(120):
+            env.step_simulation()
+              # Đóng tay gắp
+        # time.sleep(1/240)  # Đợi 1 giây để quan sát
+        # p.stepSimulation()
+        # print( opening_angle)
+        print("Hoàn thành việc đóng mở tay gắp 5 lần.")
     
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
