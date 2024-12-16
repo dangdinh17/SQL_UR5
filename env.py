@@ -249,14 +249,6 @@ class ur5GymEnv(gym.Env):
 
         self.target_dist = goal_distance(np.array(self.tool_pos), 
                                         np.array(self.goal_pos))
-        # print(self.target_dist)
-
-        # check approach velocity:
-        # tv = self.tool.getVelocity()
-        # approach_velocity = np.sum(tv)
-
-        # print(approach_velocity)
-        # input()
 
         reward += -self.target_dist * 10
 
